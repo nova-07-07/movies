@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>TV UI</title>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+<style>
+body {
+    margin: 0;
+    background: black;
+    overflow: hidden;
+    font-family: Arial;
+}
+
+/* VIDEO FULL */
+video {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: black;
+}
+
+/* SIDEBAR */
+.sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 300px;
+    height: 100%;
+    background: rgba(0,0,0,0.7);
+    padding-top: 20px;
+    transition: opacity 0.3s;
+    opacity: 1;
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+
+.sidebar::-webkit-scrollbar {
+    display: none;
+}
+.channel {
+    padding: 18px;
+    color: white;
+    font-size: 18px;
+}
+
+.selected {
+    background: #0f62fe;
+}
+
+/* LOADER */
+/* HTML: <div class="loader"></div> */
+.loader {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  height: 15px;
+  font-size: 100px;
+  aspect-ratio: 5;
+  --_g: no-repeat radial-gradient(farthest-side,#2261ff 94%,#0000);
+  background: var(--_g),var(--_g),var(--_g),var(--_g);
+  background-size: 20% 100%;
+  animation:
+    l40-1 .75s infinite alternate,
+    l40-2 1.5s infinite alternate;
+  display: none;
+}
+
+@keyframes l40-1 {
+  0%,10% {background-position: 0 0,0 0,0 0,0 0}
+  33% {background-position: 0 0,calc(100%/3) 0,calc(100%/3) 0,calc(100%/3) 0}
+  66% {background-position: 0 0,calc(100%/3) 0,calc(2*100%/3) 0,calc(2*100%/3) 0}
+  90%,100% {background-position: 0 0,calc(100%/3) 0,calc(2*100%/3) 0,100% 0}
+}
+
+@keyframes l40-2 {
+  0%,49.99% {transform: translate(-50%, -50%) scale(3)}
+  50%,100% {transform: translate(-50%, -50%) scale(-3)}
+}
+</style>
+</head>
+
+<body>
+
+<video id="video" autoplay muted playsinline></video>
+<div class="sidebar" id="sidebar"></div>
+<div class="loader" id="loader"></div>
+
+<script>
+CHANNELS = [
+    {"name": "Makkal TV", "url": "https://5k8q87azdy4v-hls-live.wmncdn.net/MAKKAL/271ddf829afeece44d8732757fba1a66.sdp/playlist.m3u8"},
+    {"name": "DD Podhigai", "url": "https://d2lk5u59tns74c.cloudfront.net/out/v1/abf46b14847e45499f4a47f3a9afe93d/index.m3u8"},
+    {"name": "EET TV", "url": "https://eu.streamjo.com/eetlive/eettv.m3u8"},
+    {"name": "IBC Tamil", "url": "https://ibc.massstream.net/IBC/index.m3u8"},
+    {"name": "Life TV", "url": "https://lifetv.livebox.co.in/lifetvhls/lifetv.m3u8"},
+    {"name": "Siripoli TV", "url": "https://segment.yuppcdn.net/240122/siripoli/playlist.m3u8"},
+    {"name": "Oli TV", "url": "https://live.olidigital.in/olitv/olitv/index.m3u8"},
+    {"name": "Amagi Tamil", "url": "https://amg17783-amg17783c1-amgplt0173.playout.now3.amagi.tv/playlist/amg17783-amg17783c1-amgplt0173/playlist.m3u8"},
+    {"name": "Roja TV", "url": "https://stream.rojatv.cloud/rojatv/rojatv/index.m3u8"},
+    {"name": "Sana Plus HD", "url": "https://mumbai-edge.smartplaytv.in/SanaPlusHD/index.m3u8"},
+    {"name": "Sai TV", "url": "https://vglivessai.akamaized.net/us/v1/master/611d79b11b77e2f571934fd80ca1413453772ac7/b6d9e864-ec16-410a-804d-ccf8f720bfaa/index.m3u8"},
+    {"name": "Vasanth TV", "url": "https://mumt04.tangotv.in/VASANTHTV/index.m3u8"},
+    {"name": "Aaseervatham TV", "url": "https://mumt04.tangotv.in/AASEERVATHAMTV/index.m3u8"},
+    {"name": "Angel TV", "url": "https://janya-digimix.akamaized.net/vglive-sk-394914/india/ngrp:angelindia_all/playlist.m3u8"},
+    {"name": "Nambikkai TV", "url": "https://mumt02.tangotv.in/NAMBIKKAITV/index.m3u8"},
+    {"name": "Charles TV", "url": "https://account20.livebox.co.in/charleshls/live.m3u8"},
+    {"name": "News7 Tamil", "url": "https://segment.yuppcdn.net/240122/news7/playlist.m3u8"},
+    {"name": "News18 Tamil Nadu", "url": "https://n18syndication.akamaized.net/bpk-tv/News18_Tamil_Nadu_NW18_MOB/output01/master.m3u8"},
+    {"name": "Polimer News", "url": "https://live-cf-polimernews.dailyhunt.in/master.m3u8"},
+    {"name": "Puthiya Thalaimurai", "url": "https://segment.yuppcdn.net/240122/puthiya/playlist.m3u8"},
+    {"name": "Sathiyam TV", "url": "https://live-cf-sathiyamtv.dailyhunt.in/master.m3u8"},
+    {"name": "7S Music", "url": "https://mumt03.tangotv.in/7SMUSIC/index.m3u8"},
+    {"name": "Murasu TV", "url": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/murasu_nim_https/050522/murasu/playlist.m3u8"},
+    {"name": "SURIYAN TV", "url": "https://live20.bozztv.com/giatv/giatv-Infinittyott/Infinittyott/playlist.m3u8"},
+    {"name": "Tamil Live 1", "url": "http://103.229.254.25:7001/play/a0dl/index.m3u8"},
+    {"name": "Tata Sky 1", "url": "https://mini.allinonereborn.fun/tata.php?id=11819"},
+    {"name": "Tata Sky 2", "url": "https://deltatesttatasky.akamaized.net/out/i/968284.m3u8"},
+    {"name": "Star Takker", "url": "https://tglmp01.akamaized.net/out/v1/c1071012b73f4f189b202e1529e8f802/manifest.mpd"},
+    {"name": "Star Vijay HD", "url": "https://peaky.techcoder40.workers.dev/776.m3u8"}
+];
+
+
+const video = document.getElementById("video");
+const sidebar = document.getElementById("sidebar");
+const loader = document.getElementById("loader");
+document.getElementsByTagName("body")[0].onclick = showSidebar;
+
+let hls;
+let selected = 0;
+let start = 0;
+let hideTimer;
+
+function getVisibleCount() {
+    const sidebarHeight = window.innerHeight;
+    const itemHeight = 58; // approx channel box height (padding + font)
+    return Math.floor(sidebarHeight / itemHeight);
+}
+
+/* RENDER */
+
+
+function render() {
+    sidebar.innerHTML = "";
+
+    const VISIBLE = getVisibleCount();
+
+    CHANNELS.slice(start, start + VISIBLE).forEach((ch, i) => {
+        const div = document.createElement("div");
+        div.className = "channel";
+        if (start + i === selected) div.classList.add("selected");
+        div.innerText = ch.name;
+        div.onclick = () => {
+            selected = start + i;
+            play(selected);
+            render();
+        };
+        sidebar.appendChild(div);
+    });
+    
+}
+
+/* PLAY */
+function play(index) {
+
+    loader.style.display = "block";
+
+    if (hls) hls.destroy();
+
+    const url = CHANNELS[index].url;
+
+    video.muted = true;
+    video.autoplay = true;
+    video.playsInline = true;
+
+    if (Hls.isSupported() && url.includes(".m3u8")) {
+        hls = new Hls();
+        hls.loadSource(url);
+        hls.attachMedia(video);
+    } else {
+        video.src = url;
+    }
+
+    video.onplaying = () => {
+        loader.style.display = "none";
+
+        setTimeout(() => {
+            video.muted = false;
+        }, 500);
+    };
+
+    video.play().catch(() => {
+        setTimeout(() => video.play(), 500);
+    });
+}
+
+/* SIDEBAR AUTO HIDE */
+function showSidebar() {
+    sidebar.style.opacity = "1";
+    clearTimeout(hideTimer);
+
+    hideTimer = setTimeout(() => {
+        sidebar.style.opacity = "0";
+    }, 5000);
+}
+
+/* KEY CONTROL */
+document.addEventListener("keydown", e => {
+
+    showSidebar();
+
+    if (e.key === "ArrowDown") {
+    const VISIBLE = getVisibleCount();
+
+    if (selected < CHANNELS.length - 1) {
+        selected++;
+        if (selected >= start + VISIBLE) start++;
+    }
+    render();
+}
+
+if (e.key === "ArrowUp") {
+    const VISIBLE = getVisibleCount();
+
+    if (selected > 0) {
+        selected--;
+        if (selected < start) start--;
+    }
+    render();
+}
+
+    if (e.key === "Enter") {
+        play(selected);
+    }
+});
+
+/* INIT */
+render();
+play(0);
+showSidebar();
+</script>
+
+</body>
+</html>

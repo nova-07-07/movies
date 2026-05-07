@@ -3,82 +3,55 @@
 <head>
 <meta charset="UTF-8">
 <title>TV UI</title>
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@0.12.4/dist/hls.min.js"></script>
 
 <style>
-body {
-    margin: 0;
-    background: black;
-    overflow: hidden;
-    font-family: Arial;
+body{
+    margin:0;
+    background:black;
+    overflow:hidden;
+    font-family:Arial;
 }
 
-/* VIDEO FULL */
-video {
-    position: fixed;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    background: black;
+video{
+    position:fixed;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    background:black;
 }
 
-/* SIDEBAR */
-.sidebar {
-    position: fixed;
-    left: 0;
-    top: 0;
-    width: 300px;
-    height: 100%;
-    background: rgba(0,0,0,0.7);
-    padding-top: 20px;
-    transition: opacity 0.3s;
-    opacity: 1;
-    overflow-y: auto;
-    scrollbar-width: none;
+.sidebar{
+    position:fixed;
+    left:0;
+    top:0;
+    width:300px;
+    height:100%;
+    background:rgba(0,0,0,0.7);
+    padding-top:20px;
+    overflow-y:auto;
+    opacity:1;
 }
 
-.sidebar::-webkit-scrollbar {
-    display: none;
-}
-.channel {
-    padding: 18px;
-    color: white;
-    font-size: 18px;
+.channel{
+    padding:18px;
+    color:white;
+    font-size:18px;
 }
 
-.selected {
-    background: #0f62fe;
+.selected{
+    background:#0f62fe;
 }
 
-/* LOADER */
-/* HTML: <div class="loader"></div> */
-.loader {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  height: 15px;
-  font-size: 100px;
-  aspect-ratio: 5;
-  --_g: no-repeat radial-gradient(farthest-side,#2261ff 94%,#0000);
-  background: var(--_g),var(--_g),var(--_g),var(--_g);
-  background-size: 20% 100%;
-  animation:
-    l40-1 .75s infinite alternate,
-    l40-2 1.5s infinite alternate;
-  display: none;
-}
-
-@keyframes l40-1 {
-  0%,10% {background-position: 0 0,0 0,0 0,0 0}
-  33% {background-position: 0 0,calc(100%/3) 0,calc(100%/3) 0,calc(100%/3) 0}
-  66% {background-position: 0 0,calc(100%/3) 0,calc(2*100%/3) 0,calc(2*100%/3) 0}
-  90%,100% {background-position: 0 0,calc(100%/3) 0,calc(2*100%/3) 0,100% 0}
-}
-
-@keyframes l40-2 {
-  0%,49.99% {transform: translate(-50%, -50%) scale(3)}
-  50%,100% {transform: translate(-50%, -50%) scale(-3)}
+.loader{
+    position:fixed;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    color:white;
+    font-size:25px;
+    display:none;
 }
 </style>
 </head>
@@ -86,11 +59,16 @@ video {
 <body>
 
 <video id="video" autoplay muted playsinline></video>
+
 <div class="sidebar" id="sidebar"></div>
-<div class="loader" id="loader"></div>
+
+<div class="loader" id="loader">
+Loading...
+</div>
 
 <script>
-CHANNELS = [
+
+var CHANNELS = [
     {"name": "Makkal TV", "url": "https://5k8q87azdy4v-hls-live.wmncdn.net/MAKKAL/271ddf829afeece44d8732757fba1a66.sdp/playlist.m3u8"},
     {"name": "DD Podhigai", "url": "https://d2lk5u59tns74c.cloudfront.net/out/v1/abf46b14847e45499f4a47f3a9afe93d/index.m3u8"},
     {"name": "EET TV", "url": "https://eu.streamjo.com/eetlive/eettv.m3u8"},
@@ -122,124 +100,189 @@ CHANNELS = [
     {"name": "Star Vijay HD", "url": "https://peaky.techcoder40.workers.dev/776.m3u8"}
 ];
 
+var video = document.getElementById("video");
+var sidebar = document.getElementById("sidebar");
+var loader = document.getElementById("loader");
 
-const video = document.getElementById("video");
-const sidebar = document.getElementById("sidebar");
-const loader = document.getElementById("loader");
-document.getElementsByTagName("body")[0].onclick = showSidebar;
+var hls = null;
+var selected = 0;
+var start = 0;
+var hideTimer = null;
 
-let hls;
-let selected = 0;
-let start = 0;
-let hideTimer;
+function getVisibleCount(){
 
-function getVisibleCount() {
-    const sidebarHeight = window.innerHeight;
-    const itemHeight = 58; // approx channel box height (padding + font)
+    var sidebarHeight = window.innerHeight;
+
+    var itemHeight = 58;
+
     return Math.floor(sidebarHeight / itemHeight);
 }
 
-/* RENDER */
+function render(){
 
-
-function render() {
     sidebar.innerHTML = "";
 
-    const VISIBLE = getVisibleCount();
+    var VISIBLE = getVisibleCount();
 
-    CHANNELS.slice(start, start + VISIBLE).forEach((ch, i) => {
-        const div = document.createElement("div");
+    for(var i=0;i<VISIBLE;i++){
+
+        var index = start + i;
+
+        if(index >= CHANNELS.length){
+            break;
+        }
+
+        var ch = CHANNELS[index];
+
+        var div = document.createElement("div");
+
         div.className = "channel";
-        if (start + i === selected) div.classList.add("selected");
-        div.innerText = ch.name;
-        div.onclick = () => {
-            selected = start + i;
+
+        if(index == selected){
+            div.className += " selected";
+        }
+
+        div.innerHTML = ch.name;
+
+        div.setAttribute("data-index",index);
+
+        div.onclick = function(){
+
+            selected = parseInt(this.getAttribute("data-index"));
+
             play(selected);
+
             render();
         };
+
         sidebar.appendChild(div);
-    });
-    
+    }
 }
 
-/* PLAY */
-function play(index) {
+function play(index){
 
     loader.style.display = "block";
 
-    if (hls) hls.destroy();
+    if(hls){
+        hls.destroy();
+        hls = null;
+    }
 
-    const url = CHANNELS[index].url;
+    var url = CHANNELS[index].url;
+
+    video.pause();
+
+    video.removeAttribute("src");
+
+    video.load();
 
     video.muted = true;
-    video.autoplay = true;
-    video.playsInline = true;
 
-    if (Hls.isSupported() && url.includes(".m3u8")) {
-        hls = new Hls();
+    if(video.canPlayType('application/vnd.apple.mpegurl')){
+
+        video.src = url;
+
+    }else if(window.Hls && Hls.isSupported()){
+
+        hls = new Hls({
+            enableWorker:false
+        });
+
         hls.loadSource(url);
+
         hls.attachMedia(video);
-    } else {
+
+    }else{
+
         video.src = url;
     }
 
-    video.onplaying = () => {
+    video.onplaying = function(){
+
         loader.style.display = "none";
 
-        setTimeout(() => {
+        setTimeout(function(){
+
             video.muted = false;
-        }, 500);
+
+        },1000);
     };
 
-    video.play().catch(() => {
-        setTimeout(() => video.play(), 500);
-    });
+    video.onerror = function(){
+
+        loader.style.display = "none";
+
+        alert("Stream not supported");
+    };
+
+    setTimeout(function(){
+
+        video.play();
+
+    },500);
 }
 
-/* SIDEBAR AUTO HIDE */
-function showSidebar() {
+function showSidebar(){
+
     sidebar.style.opacity = "1";
+
     clearTimeout(hideTimer);
 
-    hideTimer = setTimeout(() => {
+    hideTimer = setTimeout(function(){
+
         sidebar.style.opacity = "0";
-    }, 5000);
+
+    },5000);
 }
 
-/* KEY CONTROL */
-document.addEventListener("keydown", e => {
+document.body.onclick = showSidebar;
+
+document.addEventListener("keydown",function(e){
 
     showSidebar();
 
-    if (e.key === "ArrowDown") {
-    const VISIBLE = getVisibleCount();
+    if(e.keyCode == 40){
 
-    if (selected < CHANNELS.length - 1) {
-        selected++;
-        if (selected >= start + VISIBLE) start++;
+        var VISIBLE = getVisibleCount();
+
+        if(selected < CHANNELS.length - 1){
+
+            selected++;
+
+            if(selected >= start + VISIBLE){
+                start++;
+            }
+
+            render();
+        }
     }
-    render();
-}
 
-if (e.key === "ArrowUp") {
-    const VISIBLE = getVisibleCount();
+    if(e.keyCode == 38){
 
-    if (selected > 0) {
-        selected--;
-        if (selected < start) start--;
+        if(selected > 0){
+
+            selected--;
+
+            if(selected < start){
+                start--;
+            }
+
+            render();
+        }
     }
-    render();
-}
 
-    if (e.key === "Enter") {
+    if(e.keyCode == 13){
+
         play(selected);
     }
 });
 
-/* INIT */
 render();
+
 play(0);
+
 showSidebar();
+
 </script>
 
 </body>
